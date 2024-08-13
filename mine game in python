@@ -102,4 +102,51 @@ class Minesweeper(tk.Tk):
         if self.game_over or self.reveal_board[y][x] != ' ':
             return
         
-      
+        if self.flagged[y][x]:
+            self.flagged[y][x] = False
+            self.buttons[y][x].config(text='', bg="lightgray")
+        else:
+            self.flagged[y][x] = True
+            self.buttons[y][x].config(text='F', bg="yellow")
+
+    def update_buttons(self):
+        for y in range(HEIGHT):
+            for x in range(WIDTH):
+                if self.reveal_board[y][x] != ' ':
+                    self.buttons[y][x].config(text=self.reveal_board[y][x], relief=tk.SUNKEN, bg=self.get_color(self.reveal_board[y][x]))
+                elif self.flagged[y][x]:
+                    self.buttons[y][x].config(text='F', bg="yellow")
+                else:
+                    self.buttons[y][x].config(text='', relief=tk.RAISED, bg="lightgray")
+
+    def get_color(self, text):
+        colors = {
+            '1': 'lightblue',
+            '2': 'lightgreen',
+            '3': 'lightcoral',
+            '4': 'lightslategray',
+            '5': 'red',
+            '6': 'darkorange',
+            '7': 'purple',
+            '8': 'gray'
+        }
+        return colors.get(text, 'lightgray')
+
+    def reveal_all_cells(self):
+        for y in range(HEIGHT):
+            for x in range(WIDTH):
+                if self.board[y][x] == 'M':
+                    self.buttons[y][x].config(text='M', relief=tk.SUNKEN, bg='red')
+                elif self.reveal_board[y][x] != ' ':
+                    self.buttons[y][x].config(text=self.reveal_board[y][x], relief=tk.SUNKEN, bg=self.get_color(self.reveal_board[y][x]))
+
+    def check_win(self):
+        for y in range(HEIGHT):
+            for x in range(WIDTH):
+                if self.board[y][x] != 'M' and self.reveal_board[y][x] == ' ':
+                    return False
+        return True
+
+if __name__ == "__main__":
+    app = Minesweeper()
+    app.mainloop()
