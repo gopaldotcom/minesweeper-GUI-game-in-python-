@@ -1,147 +1,105 @@
-import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QGridLayout, QWidget, QMessageBox
+import tkinter as tk
+from tkinter import messagebox
 import random
-from PyQt5.QtCore import Qt
 
-class MineButton(QPushButton):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.is_flagged = False
+WIDTH = 11
+HEIGHT = 5
+MINES = 10
 
-    def mousePressEvent(self, event):
-        if event.button() == Qt.RightButton:
-            self.toggle_flag()
-        else:
-            super().mousePressEvent(event)
-
-    def toggle_flag(self):
-        if not self.isEnabled():
-            return
-        self.is_flagged = not self.is_flagged
-        self.setText('F' if self.is_flagged else '')
-        self.setStyleSheet('background-color: orange' if self.is_flagged else '')
-
-class Minesweeper(QMainWindow):
-    def __init__(self, rows=10, cols=10, mines=10):
+class Minesweeper(tk.Tk):
+    def __init__(self):
         super().__init__()
+        self.title("Minesweeper")
+        self.geometry("400x450")
+        self.configure(bg="lightgray")
+        self.create_widgets()
+        self.reset_game()
 
-        self.rows = rows
-        self.cols = cols
-        self.mines = mines
-        self.grid = []
-        self.revealed = []
+    def create_widgets(self):
+        self.buttons = [[None for _ in range(WIDTH)] for _ in range(HEIGHT)]
+        self.flagged = [[False for _ in range(WIDTH)] for _ in range(HEIGHT)]
 
-        self.initUI()
+        for y in range(HEIGHT):
+            for x in range(WIDTH):
+                button = tk.Button(self, width=3, height=2, font=('Arial', 10, 'bold'), command=lambda x=x, y=y: self.on_button_click(x, y))
+                button.bind("<Button-3>", lambda e, x=x, y=y: self.on_right_click(x, y))
+                button.grid(row=y, column=x, padx=1, pady=1)
+                self.buttons[y][x] = button
 
-    def initUI(self):
-        self.central_widget = QWidget()
-        self.setCentralWidget(self.central_widget)
-        self.grid_layout = QGridLayout()
-        self.central_widget.setLayout(self.grid_layout)
+        self.retry_button = tk.Button(self, text="Try Again", font=('Arial', 12), command=self.reset_game, state=tk.DISABLED, bg="lightblue")
+        self.retry_button.grid(row=HEIGHT, column=0, columnspan=WIDTH, sticky="ew", pady=10)
 
-        self.create_grid()
-        self.place_mines()
-
-        self.setWindowTitle('minesweeper')
-        self.show()
-
-    def create_grid(self):
-        for row in range(self.rows):
-            row_cells = []
-            for col in range(self.cols):
-                button = MineButton('')
-                button.setFixedSize(30, 30)
-                button.clicked.connect(self.cell_clicked)
-                self.grid_layout.addWidget(button, row, col)
-                row_cells.append(button)
-            self.grid.append(row_cells)
-
-    def place_mines(self):
-        for _ in range(self.mines):
-            while True:
-                row = random.randint(0, self.rows - 1)
-                col = random.randint(0, self.cols - 1)
-                if not hasattr(self.grid[row][col], 'mine'):
-                    self.grid[row][col].mine = True
-                    break
-
-
-    def cell_clicked(self):
-        button = self.sender()
-        row, col = self.get_cell_position(button)
-        if button.is_flagged:
-            return
-        if hasattr(button, 'mine'):
-            self.reveal_mines()
-            QMessageBox.critical(self, 'losed', 'you clicked a mine!')
-            self.reset_game()
-        else:
-            self.reveal_cell(row, col)
-            if self.check_win():
-                QMessageBox.information(self, 'yoo!', 'You won!')
-                self.reset_game()
-
-    def get_cell_position(self, button):
-        for row in range(self.rows):
-            for col in range(self.cols):
-                if self.grid[row][col] == button:
-                    return row, col
-        return None
-
-    def reveal_mines(self):
-        for row in self.grid:
-            for button in row:
-                if hasattr(button, 'mine'):
-                    button.setText('M')
-                    button.setStyleSheet('background-color: red')
-
-    def reveal_cell(self, row, col):
-        button = self.grid[row][col]
-        if (row, col) in self.revealed:
-            return
-        self.revealed.append((row, col))
-        button.setEnabled(False)
-        button.setStyleSheet('background-color: lightgreen')
-        surrounding_mines = self.count_surrounding_mines(row, col)
-        if surrounding_mines > 0:
-            button.setText(str(surrounding_mines))
-        else:
-            for r in range(max(0, row-1), min(self.rows, row+2)):
-                for c in range(max(0, col-1), min(self.cols, col+2)):
-                    if r == row and c == col:
-                        continue
-                    self.reveal_cell(r, c)
-
-    def count_surrounding_mines(self, row, col):
-        count = 0
-        for r in range(max(0, row-1), min(self.rows, row+2)):
-            for c in range(max(0, col-1), min(self.cols, col+2)):
-                if r == row and c == col:
-                    continue
-                if hasattr(self.grid[r][c], 'mine'):
-                    count += 1
-        return count
-                    
-    def check_win(self):
-        for row in self.grid:
-            for button in row:
-                if not hasattr(button, 'mine') and button.isEnabled():
-                    return False
-        return True
+        self.status = tk.Label(self, text="Welcome to Minesweeper!", font=('Arial', 12), bg="lightgray")
+        self.status.grid(row=HEIGHT+1, column=0, columnspan=WIDTH, sticky="ew")
 
     def reset_game(self):
-        self.revealed = []
-        for row in self.grid:
-            for button in row:
-                button.setEnabled(True)
-                button.setText('')
-                button.setStyleSheet('')
-                button.is_flagged = False
-                if hasattr(button, 'mine'):
-                    del button.mine
-        self.place_mines()
+        self.board = self.create_board(WIDTH, HEIGHT, MINES)
+        self.reveal_board = [[' ' for _ in range(WIDTH)] for _ in range(HEIGHT)]
+        self.game_over = False
+        self.flagged = [[False for _ in range(WIDTH)] for _ in range(HEIGHT)]
+        self.retry_button.config(state=tk.DISABLED, bg="lightblue")
+        self.status.config(text="Welcome to Minesweeper game!")
+        self.update_buttons()
 
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    game = Minesweeper()
-    sys.exit(app.exec_())
+    def create_board(self, width, height, mines):
+        board = [[' ' for _ in range(width)] for _ in range(height)]
+        mines_placed = 0
+        
+        while mines_placed < mines:
+            x, y = random.randint(0, width - 1), random.randint(0, height - 1)
+            if board[y][x] != 'M':
+                board[y][x] = 'M'
+                mines_placed += 1
+        
+        return board
+
+    def count_adjacent_mines(self, x, y):
+        directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+        count = 0
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < WIDTH and 0 <= ny < HEIGHT:
+                if self.board[ny][nx] == 'M':
+                    count += 1
+        return count
+
+    def reveal_cell(self, x, y):
+        if self.board[y][x] == 'M':
+            return False
+        
+        adjacent_mines = self.count_adjacent_mines(x, y)
+        self.reveal_board[y][x] = str(adjacent_mines) if adjacent_mines > 0 else ' '
+        
+        if adjacent_mines == 0:
+            directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+            for dx, dy in directions:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < WIDTH and 0 <= ny < HEIGHT:
+                    if self.reveal_board[ny][nx] == ' ':
+                        self.reveal_cell(nx, ny)
+        
+        return True
+
+    def on_button_click(self, x, y):
+        if self.game_over or self.flagged[y][x]:
+            return
+        
+        if not self.reveal_cell(x, y):
+            self.game_over = True
+            self.reveal_all_cells()
+            self.status.config(text="Game Over! You hit a mine.")
+            messagebox.showinfo("Game Over", "Boom! You hit a mine.")
+            self.retry_button.config(state=tk.NORMAL, bg="lightcoral")
+        else:
+            self.update_buttons()
+            if self.check_win():
+                self.game_over = True
+                self.status.config(text="Congratulations! You won the game!")
+                messagebox.showinfo("Congratulations", "You won the game!")
+                self.retry_button.config(state=tk.NORMAL, bg="lightgreen")
+
+    def on_right_click(self, x, y):
+        if self.game_over or self.reveal_board[y][x] != ' ':
+            return
+        
+      
